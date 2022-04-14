@@ -1,0 +1,110 @@
+from __future__ import print_function
+import rospy
+import cv2 as cv
+from clover import srv
+from std_srvs.srv import Trigger
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image
+from clover.srv import SetLEDEffect
+from pyzbar.pyzbar import decode as qr_read
+from threading import Thread
+bridge = CvBridge()
+rospy.init_node('flight')
+
+color_debug = rospy.Publisher("/color_debug", Image,queue_size=1)
+qr_debug = rospy.Publisher("/qr_debug", Image,queue_size=1)
+
+navigate = rospy.ServiceProxy('navigate', srv.Navigate)
+land = rospy.ServiceProxy('land', Trigger)
+
+def check_temp1(data):
+    global cc
+    frame = bridge.imgmsg_to_cv2(data, 'bgr8')[80:160, 100:220]
+    hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+
+    red = cv.inRange(hsv, (255, 55, 0), (255, 255, 10))
+    blue = cv.inRange(hsv, (110,50,50), (130,255,255))
+    green = cv.inRange(hsv, (53, 0, 0), (83, 255, 255))
+
+    color = {'r': cv.countNonZero(red), 'b': cv.countNonZero(blue), 'g': cv.countNonZero(green)}
+    temperature = max(color, key=color.get)
+    try:
+        for i in temperature:
+            print(i)
+            if i == 'r':
+                cc = 'r'
+            if i == 'b':
+                cc = 'b'
+            if i == 'g':
+                cc = 'g'
+    except ZeroDivisionError:
+        print('zero')
+    image_sub.unregister()
+
+def check_temp(data):
+    frame = bridge.imgmsg_to_cv2(data, 'bgr8')[80:160, 100:220]
+    hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+
+    red = cv.inRange(hsv, (255, 55, 0), (255, 255, 10))
+    blue = cv.inRange(hsv, (110,50,50), (130,255,255))
+    green = cv.inRange(hsv, (53, 0, 0), (83, 255, 255))
+
+    color = {'r': cv.countNonZero(red), 'b': cv.countNonZero(blue), 'g': cv.countNonZero(green)}
+    temperature = max(color, key=color.get)
+    try:
+        for i in temperature:
+            print(i)
+            if i == 'r':
+                print("red")
+                if i == cc:
+                    print('NASHOL')
+                    land()
+            if i == 'b':
+                print("blue")
+                if i == cc:
+                    print('NASHOL')
+                    land()
+            if i == 'g':
+                print("green")
+                if i == cc:
+                    print('NASHOL')
+                    land()
+    except ZeroDivisionError:
+        print('zero')
+    image_sub.unregister()
+
+def qr_check(data):
+    global cap
+    frame = bridge.imgmsg_to_cv2(data, 'bgr8')
+    barcodes = qr_read(frame)
+    cap = barcodes[0].data
+    image_sub.unregister()
+
+navigate(x=0, y=0, z=1, speed=0.5, frame_id='body', auto_arm=True)
+rospy.sleep(8)
+navigate(x=0, y=0.5, z=1, speed=1, frame_id='aruco_map')
+rospy.sleep(5)
+image_sub = rospy.Subscriber('main_camera/image_raw', Image, check_temp1, queue_size=1)
+rospy.sleep(2)
+navigate(x=0, y=1.5, z=1, speed=1, frame_id='aruco_map')
+rospy.sleep(8)
+image_sub = rospy.Subscriber('main_camera/image_raw', Image, qr_check, queue_size=1)
+rospy.sleep(4)
+
+m = cap.split()
+x=0
+y=1
+for i in range(int(len(m)/2)):
+    navigate(x=float(m[x]), y=float(m[y]), z=1, speed=1, frame_id='aruco_map')
+    rospy.sleep(8)
+    image_sub = rospy.Subscriber('main_camera/image_raw', Image, check_temp, queue_size=1)
+    rospy.sleep(2)
+    x = x + 2
+    y= y + 2
+land()
+
+f=open('e.txt', 'w')
+f.write('osnova- ' + cc)
+f.write('\n')
+f.write('qr- ' + cap)
+f.close()
