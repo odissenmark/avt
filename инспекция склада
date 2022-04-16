@@ -31,7 +31,6 @@ land()
 
 # НИЖЕ КОД ДЛЯ РАСПОЗНАВАНИЯ КУАР КОДОВ
 
-GNU nano 4.8                                                                                                                         2.py                                                                                                                                    
 import rospy
 from clover import srv
 from pyzbar import pyzbar
@@ -52,24 +51,44 @@ bridge = CvBridge()
 
 rospy.init_node('barcode_test')
 
+global b_data, b_type
+
 def image_callback(data):
-        cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')
-        barcodes = pyzbar.decode(cv_image)
-        for barcode in barcodes:
-                b_data = barcode.data.decode("utf-8")
-                b_type = barcode.type
-                (x, y, w, h) = barcode.rect
-                xc = x + w/2
-                yc = y + h/2
-                print("Found {} with data {} with center at x={}, y={}".format(b_type, b_data, xc, yc))
+	global b_data, b_type
+	cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')
+	barcodes = pyzbar.decode(cv_image)
+	for barcode in barcodes:
+ 		b_data = barcode.data.decode("utf-8")
+ 		b_type = barcode.type
+ 		(x, y, w, h) = barcode.rect
+ 		xc = x + w/2
+ 		yc = y + h/2
+ 		print("Found {} with data {} with center at x={}, y={}".format(b_type, b_data, xc, yc))
 
 image_sub = rospy.Subscriber('main_camera/image_raw', Image, image_callback, queue_size=1)
 
 navigate(x=0, y=0, z=0.5, frame_id='body', auto_arm=True)
+rospy.sleep(10)
 
-rospy.sleep(20)
+f=open('e.txt', 'w')
+f.write('DATA FROM QR1: ' + b_data)
+f.write('\n')
+f.close()
+
+navigate(x=2, y=0, z=0.5, frame_id='body')
+rospy.sleep(5)
+
+f=open('e.txt', 'a')
+f.write('DATA FROM QR2:' + b_data)
+f.write('\n')
+f.close()
 
 land()
+
+
+# ПОСЛЕ КАЖДОГО НАВИГЕЙТА В ФАЙЛ ЗАПИСЫВАЕТСЯ ЗНАЧЕНИЯ С КУАР КОДА
+# ПОСЛЕ ВТОРОГО НАВИГЕЙТА f=open('e.txt', 'a') ГДЕ ВТОРОЙ ПАРАМЕТР 'a' ЭТО ДОЗАПИСЬ, ПАРАМЕТР 'w' ЭТО ЗАПИСЬ(ПРИМЕНЯЕТСЯ ТОЛЬКО 1 РАЗ, В ОСТАЛЬНЫХ СЛУЧАЯХ ДОЗАПИСЬ)
+# ПИСАТЬ 4 СТРОЧКИ НА ЗАПИСЬ/ДОЗАПИСЬ НАДО ПОСЛЕ КАЖДОГО НАВИГЕЙТА, ТО ЕСТЬ ДРОН ПРИЛЕТЕЛ В ТОЧКУ, ОТСКАНИРОВАЛ, ЗАПИСАЛ, ПОТОМ К СЛЕД ТОЧКЕ
 
 # В ТЕРМИНАЛЕ УСТАНОВИ БИБЛИОТЕКУ PYZBAR, ОНА ДЛЯ РАСПОЗНАВАНИЯ КУАР КОДОВ
 # pip install pyzbar
