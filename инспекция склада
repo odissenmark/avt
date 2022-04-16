@@ -31,31 +31,43 @@ land()
 
 # НИЖЕ КОД ДЛЯ РАСПОЗНАВАНИЯ КУАР КОДОВ
 
+GNU nano 4.8                                                                                                                         2.py                                                                                                                                    
 import rospy
+from clover import srv
 from pyzbar import pyzbar
+from std_srvs.srv import Trigger
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
+
+get_telemetry = rospy.ServiceProxy('get_telemetry', srv.GetTelemetry)
+navigate = rospy.ServiceProxy('navigate', srv.Navigate)
+navigate_global = rospy.ServiceProxy('navigate_global', srv.NavigateGlobal)
+set_position = rospy.ServiceProxy('set_position', srv.SetPosition)
+set_velocity = rospy.ServiceProxy('set_velocity', srv.SetVelocity)
+set_attitude = rospy.ServiceProxy('set_attitude', srv.SetAttitude)
+set_rates = rospy.ServiceProxy('set_rates', srv.SetRates)
+land = rospy.ServiceProxy('land', Trigger)
 
 bridge = CvBridge()
 
 rospy.init_node('barcode_test')
 
 def image_callback(data):
-    cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')  # OpenCV image
-    barcodes = pyzbar.decode(cv_image)
-    for barcode in barcodes:
-        b_data = barcode.data.decode("utf-8")
-        b_type = barcode.type
-        (x, y, w, h) = barcode.rect
-        xc = x + w/2
-        yc = y + h/2
-        print("Found {} with data {} with center at x={}, y={}".format(b_type, b_data, xc, yc))
+        cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')
+        barcodes = pyzbar.decode(cv_image)
+        for barcode in barcodes:
+                b_data = barcode.data.decode("utf-8")
+                b_type = barcode.type
+                (x, y, w, h) = barcode.rect
+                xc = x + w/2
+                yc = y + h/2
+                print("Found {} with data {} with center at x={}, y={}".format(b_type, b_data, xc, yc))
 
 image_sub = rospy.Subscriber('main_camera/image_raw', Image, image_callback, queue_size=1)
 
-navigate(x=0, y=0, z=1, frame_id='body', auto_arm=True)
+navigate(x=0, y=0, z=0.5, frame_id='body', auto_arm=True)
 
-rospy.sleep(5)
+rospy.sleep(20)
 
 land()
 
